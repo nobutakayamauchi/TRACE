@@ -1,0 +1,10 @@
+{
+  "system": "TRACE",
+  "event": "GENESIS_TIMESTAMP",
+  "source_timestamp": "2026-08-11T11:09:00+09:00",
+  "source_timestamp_basis": "explicit human declaration in the originating conversation",
+  "capture_note": "GitHub commit metadata provides an independent repository write timestamp; do not silently rewrite the user-declared source timestamp to match capture time.",
+  "bootstrap_commit": "79a920dd3f21bd9b77fb7fa710b733a3c88ee610",
+  "bootstrap_file": "TRACE_BOOTSTRAP.md",
+  "status": "STARTING_POINT_DECLARED"
+}
