@@ -1,0 +1,8 @@
+{
+  "run_id": "0001",
+  "instruction": "Execute CODEX_START.md",
+  "user_declared_start": "2026-08-11T11:11:00+09:00",
+  "genesis_timestamp": "2026-08-11T11:09:00+09:00",
+  "status": "STARTED",
+  "note": "Codex execution was initiated by the user from the connected Codex environment. This record marks the declared start; GitHub commit time is independent evidence of this marker being written."
+}
