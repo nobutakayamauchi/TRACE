@@ -1,0 +1,41 @@
+{
+  "run_id": "0001",
+  "snapshot_at": "2026-08-11T13:09:00+09:00",
+  "human_operational_start_at": "2026-08-11T11:09:00+09:00",
+  "original_run": {
+    "codex_ack": "NOT_OBSERVED",
+    "execution_state": "UNKNOWN",
+    "first_output": "NOT_OBSERVED",
+    "result": "NOT_OBSERVED",
+    "visible_branch": "NOT_OBSERVED",
+    "visible_pull_request": "NOT_OBSERVED"
+  },
+  "independent_probe": {
+    "ssh_host_access": "PASS",
+    "codex_cli_version": "0.147.0",
+    "provider": "openai",
+    "model": "gpt-5.6-sol",
+    "model_response": "PASS",
+    "github_clone": "PASS",
+    "workspace_write_sandbox": "FAIL",
+    "workspace_write_failure": "bubblewrap RTM_NEWADDR Operation not permitted",
+    "full_access_file_write": "PASS",
+    "git_commit": "PASS",
+    "github_push": "PASS",
+    "probe_commit": "29b00841910b08df294e55de1291e22561c58243"
+  },
+  "github_sweep": {
+    "branches": ["main"],
+    "pull_requests": [],
+    "trace_v0_1_result_found": false,
+    "separate_original_run_implementation_commit_observed": false
+  },
+  "surviving_hypotheses": [
+    "dispatch_did_not_establish_runnable_job",
+    "job_accepted_but_never_started",
+    "job_started_then_stalled_or_terminated_before_visible_artifact",
+    "job_completed_outside_inspected_github_surfaces_without_publication",
+    "completion_or_handoff_failed_after_execution"
+  ],
+  "measurement_rule": "Do not label silence since 11:09 as Codex execution latency until an explicit Codex ACK or equivalent receipt exists."
+}
