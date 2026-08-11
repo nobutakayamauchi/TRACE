@@ -98,6 +98,15 @@ Source: active diagnostic sweep.
 - Original Run 0001 status remains: `UNKNOWN`.
 - Original Run 0001 response status remains: `NOT_OBSERVED`.
 
+### 13:16
+Source: user-provided screenshot of the Codex task list in ChatGPT.
+
+- The visible task list showed prior WITNESS / RTS tasks but no task visibly attributable to TRACE or Run 0001.
+- No running, failed, completed, waiting, or cancelled TRACE task was visible in the captured list.
+- This observation does NOT prove that no task object ever existed; it establishes only that the expected TRACE task was not visible in this task-list surface at 13:16.
+- Classification: `TASK_NOT_VISIBLE_ON_TASK_LIST`.
+- Original Run 0001 remains `UNKNOWN`; however, the hypothesis that a normal visible Codex task was successfully established at dispatch time is materially weakened.
+
 ## Current eliminations / surviving hypotheses
 
 Eliminated or materially weakened:
@@ -109,14 +118,16 @@ Eliminated or materially weakened:
 - GitHub repository read path unavailable from the VM.
 - GitHub push path unavailable from the VM.
 - Original work completed on another visible TRACE branch or PR.
+- A normal visible TRACE Codex task remaining present in the inspected task-list surface at 13:16.
 
 Still viable for original Run 0001:
 
 1. Dispatch / task creation did not actually establish a runnable Codex job.
-2. Job was accepted but never started.
-3. Job started and stalled or terminated before producing a GitHub-visible artifact.
-4. Job completed somewhere outside the inspected GitHub surfaces but did not publish its result.
-5. Completion / handoff path failed even if execution succeeded.
+2. Job object was created transiently but is not visible on the inspected task-list surface.
+3. Job was accepted but never started, then disappeared or was not surfaced.
+4. Job started and stalled or terminated before producing a GitHub-visible artifact.
+5. Job completed somewhere outside the inspected GitHub/task-list surfaces but did not publish its result.
+6. Completion / handoff path failed even if execution succeeded.
 
 ## Measurement consequence
 
