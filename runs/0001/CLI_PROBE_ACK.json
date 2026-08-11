@@ -1,0 +1,6 @@
+{
+  "event": "CODEX_CLI_GITHUB_PROBE",
+  "status": "PASS",
+  "observed_at": "2026-08-11T04:06:57Z",
+  "note": "Independent SSH Codex CLI probe; this does not prove original Run 0001 execution state."
+}
