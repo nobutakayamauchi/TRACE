@@ -1,0 +1,26 @@
+[
+  {
+    "repository": "nobutakayamauchi/WebAI-Bridge",
+    "pr": 7,
+    "claim": "MERGED_TO_TARGET",
+    "target_branch": "main",
+    "source_ref": "current-visible-human-report",
+    "capture_order": 1
+  },
+  {
+    "repository": "nobutakayamauchi/WebAI-Bridge",
+    "pr": 8,
+    "claim": "MERGED_TO_TARGET",
+    "target_branch": "main",
+    "source_ref": "current-visible-human-report",
+    "capture_order": 1
+  },
+  {
+    "repository": "nobutakayamauchi/WebAI-Bridge",
+    "pr": 9,
+    "claim": "MERGED_TO_TARGET",
+    "target_branch": "main",
+    "source_ref": "current-visible-human-report",
+    "capture_order": 1
+  }
+]
