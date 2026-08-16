@@ -5,14 +5,14 @@
   "capture_mode": "RETROSPECTIVE_THEN_LIVE",
   "captured_at": "2026-08-16T20:02:00+09:00",
   "first_sealed_at": "2026-08-16T20:09:39+09:00",
-  "last_resealed_at": "2026-08-16T20:11:18+09:00",
-  "record_count": 27,
-  "events_sha256": "fb1be9d1b3f6554ec954e7a67967011f926f9e3fa32e1a24b1ca00c9629b5031",
-  "head_record_hash": "fedb5934f65971b926f72c1ff8225b4f63ff8a3be704def82332aaf45440e885",
+  "last_resealed_at": "2026-08-16T20:13:36+09:00",
+  "record_count": 33,
+  "events_sha256": "3acb7b4312ff092b43a1cd027b28dd0e3adf97209a8727bec4ee1282c3ac5116",
+  "head_record_hash": "2a2b1b991079996534cf026818fe080c6fee47cd3ae2f5034938fb19e333adce",
   "sealed_prefix_last_record": "r25",
-  "current_last_record": "r27",
+  "current_last_record": "r33",
   "events_file_commit_at_first_seal": "b56583bd0087da8f2439757135b1f0b1dd91008e",
-  "latest_append_commit": "2dc74fd2b31f5baa4d36d8d129104623b8cb1752",
+  "latest_append_commit": "77cbff6ba2bde33fa6a290199fcc92015e94f8a8",
   "hash_profile": "TRACE-UL-v0: SHA-256 over UTF-8 canonical JSON with sorted keys and compact separators; record_hash excludes record_hash itself; previous_record_hash chains records.",
   "live_boundary": {
     "record_id": "r9",
@@ -20,7 +20,8 @@
   },
   "seal_rule": {
     "before_first_seal": "BUILDING records may be regenerated to correct capture/schema errors and are not authoritative seals.",
-    "after_first_seal": "Records r1-r25 are frozen. Future observations append new records; corrections cite prior records rather than editing them."
+    "after_first_seal": "Records r1-r25 are frozen. Future observations append new records; corrections cite prior records rather than editing them.",
+    "self_reference": "Manifest/seal maintenance is integrity metadata and is not required to create a new event inside the same chain merely because the manifest changed."
   },
   "limitations": [
     "Pre-attachment records are reconstructed and are not claimed as live TRACE observations.",
