@@ -1,0 +1,45 @@
+{
+  "observed_at": "2026-08-16T20:14:00+09:00",
+  "source": "GitHub connector point-in-time PR metadata",
+  "prs": [
+    {
+      "repository": "nobutakayamauchi/WebAI-Bridge",
+      "pr": 7,
+      "state": "open",
+      "merged": false,
+      "draft": false,
+      "base": "main",
+      "base_sha": "db295920fd147857d465a2caba7eaa737124868b",
+      "head": "goal/e2e-commercial-dogfood-v0",
+      "head_sha": "e871c0b55393e7a455646c9f64922cb6a2725cfa",
+      "merge_commit_sha": "04dc61d42c613cb78ef08edaa3e730489257f168",
+      "merged_at": null
+    },
+    {
+      "repository": "nobutakayamauchi/WebAI-Bridge",
+      "pr": 8,
+      "state": "open",
+      "merged": false,
+      "draft": false,
+      "base": "main",
+      "base_sha": "db295920fd147857d465a2caba7eaa737124868b",
+      "head": "goal/free-external-dogfood-v0",
+      "head_sha": "4bf27454c7d284465c4e41e08118b02f62d080b4",
+      "merge_commit_sha": "d480ccb190bbf0b662d7561d3110fd72e9389832",
+      "merged_at": null
+    },
+    {
+      "repository": "nobutakayamauchi/WebAI-Bridge",
+      "pr": 9,
+      "state": "closed",
+      "merged": true,
+      "draft": false,
+      "base": "main",
+      "base_sha": "db295920fd147857d465a2caba7eaa737124868b",
+      "head": "goal/free-dogfood-host-launcher-v0",
+      "head_sha": "b2c6802ddda66cf5589ebab612e0af3c010e9633",
+      "merge_commit_sha": "69220368a1dc831782eaf3b75c545141f1d99ec5",
+      "merged_at": "2026-08-16T11:06:58Z"
+    }
+  ]
+}
