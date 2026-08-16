@@ -14,26 +14,30 @@ The live boundary is the visible human decision:
 
 ## Reconstructed development sequence
 
-| Time (JST) | Evidence-backed transition | Tests reported |
+The table below reports repository/PR transitions first. Any Ultimate Loop semantic interpretation is derived from those sources and is not treated as a Git fact by itself.
+
+| Time (JST) | Repository/PR evidence | Tests reported |
 |---|---|---:|
-| 17:34 | WebAI-Bridge repository initialized | — |
-| 17:40 | Product bootstrap promoted: package schema, runtime, cost/payer boundaries, BYOK/platform-credit boundary | 12 |
-| 19:16 | Creator Studio thin v0 promoted after Raison d'être / METEOR / DA / Counter-DA | 45 |
-| 19:31 | Manual paid hosted entitlement v0 promoted | 69 |
-| 19:38 | Fail-closed deployment preflight promoted | 85 |
-| 19:44 | Fail-closed package installer promoted | 97 |
-| 19:51 | Deployment bootstrap + live acceptance promoted; external-evidence boundary reached | 123 |
+| 17:34 | WebAI-Bridge initial commit recorded | — |
+| 17:40 | PR #1 / bootstrap merge recorded | 12 |
+| 19:16 | PR #2 / Creator Studio merge recorded | 45 |
+| 19:31 | PR #3 / manual paid entitlement merge recorded | 69 |
+| 19:38 | PR #4 / deployment preflight merge recorded | 85 |
+| 19:44 | PR #5 / package installer merge recorded | 97 |
+| 19:51 | PR #6 / deployment bootstrap + live acceptance merge recorded; PR declares `READY_FOR_EXTERNAL_DOGFOOD / NOT_DEPLOYED` | 123 |
 | 20:02 | Human orders TRACE attachment and continuation of Ultimate Loop | live boundary |
 
-## What the sequence demonstrates
+## Derived Ultimate Loop interpretation
 
-The GitHub record supports a sequence in which successive bounded workloads accumulated additional safety, authority, commercial, deployment and regression obligations rather than merely adding visible features.
+The PR descriptions and merge sequence support a derived interpretation that successive bounded workloads accumulated additional safety, authority, commercial, deployment and regression obligations rather than merely adding visible features.
+
+This interpretation remains derived. The Git records themselves establish commits/merges and their reported metadata, not a universal semantic claim that each merge was a valid Ultimate Loop promotion.
 
 The test-count sequence `12 → 45 → 69 → 85 → 97 → 123` is preserved as a **derived metric**. It is evidence of accumulating test coverage reported by the PR/commit history, not proof of production correctness.
 
 ## External evidence deliberately not promoted
 
-At the final reconstructed WebAI-Bridge boundary, the code itself explicitly refused to claim the following without real infrastructure:
+At the final reconstructed WebAI-Bridge boundary, PR #6 explicitly left the following facts unproven without real infrastructure:
 
 - real host filesystem/service identity;
 - real public hostname/DNS;
@@ -42,7 +46,7 @@ At the final reconstructed WebAI-Bridge boundary, the code itself explicitly ref
 - real BYOK provider credential/call;
 - real iPhone/Safari behavior.
 
-This boundary is important because it shows the loop stopped making code-only claims when the next proof required reality.
+This boundary matters because the repository record itself distinguishes code preparation from external runtime evidence.
 
 ## Observer integration decision
 
