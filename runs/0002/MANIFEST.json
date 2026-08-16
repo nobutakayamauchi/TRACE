@@ -1,0 +1,21 @@
+{
+  "run_id": "UL-TRACE-2026-08-16-0002",
+  "subject": "Ultimate Loop TRACE attachment during WebAI-Bridge dogfood",
+  "capture_mode": "RETROSPECTIVE_THEN_LIVE",
+  "captured_at": "2026-08-16T20:02:00+09:00",
+  "record_count": 10,
+  "events_sha256": "d35eb48ad03e040c17d072fb3e7520b1a58271305ed89caf58021c5b9eee7ef1",
+  "head_record_hash": "056c42f16c721d0590ebc72b589e8ed7913a90f45ef001c71c4f730681298ef9",
+  "hash_profile": "TRACE-UL-v0: SHA-256 over UTF-8 canonical JSON with sorted keys and compact separators; record_hash excludes record_hash itself; previous_record_hash chains records.",
+  "live_boundary": {
+    "record_id": "r9",
+    "meaning": "The human directive to attach TRACE is captured from the current visible conversation. Earlier records are retrospective reconstructions from surviving evidence."
+  },
+  "limitations": [
+    "Pre-attachment records are reconstructed and are not claimed as live TRACE observations.",
+    "GitHub evidence does not expose hidden model reasoning.",
+    "Passing tests do not independently prove production correctness.",
+    "The current visible chat capture is not independently timestamp-notarized.",
+    "Real host, TLS, provider, buyer entitlement and iPhone evidence remain external to the reconstructed code history."
+  ]
+}
