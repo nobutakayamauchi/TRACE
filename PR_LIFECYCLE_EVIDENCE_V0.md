@@ -70,27 +70,31 @@ Semantic claims are derived, for example:
 
 A human-visible statement may be preserved as source evidence, but the lifecycle interpretation remains derived.
 
+For a single reconciliation packet where exact timestamps are unavailable but capture sequence is known, an optional integer `capture_order` may establish relative ordering. It is not a timestamp and must not be generalized beyond that packet.
+
 ## Ordering and freshness
 
-Three notions remain separate:
+Keep separate:
 
 - `source_order`: archive ingest order;
 - source/event time: when the underlying event is reported to have happened;
-- `observed_at` / `captured_at`: when TRACE observed or captured the state.
+- `observed_at` / `captured_at`: when TRACE observed or captured the state;
+- optional reconciliation-packet `capture_order`: relative capture sequence only.
 
 For current-state reconciliation, prefer explicit `observed_at`, then source timestamp, then capture timestamp. Do not treat later ingest order as proof of later real-world state.
 
-If a GitHub snapshot predates a claim or a newer TRACE observation, it cannot refute that later claim/observation.
+If source freshness cannot be ordered, preserve `UNKNOWN` rather than declaring a contradiction. If a GitHub snapshot predates a claim or a newer TRACE observation, it cannot refute that later claim/observation.
 
 ## Reconciliation outcomes
 
 The prototype may emit:
 
-- `TRACE_COVERAGE_GAP` — GitHub snapshot includes a PR but TRACE has no lifecycle record;
-- `MISSING_MERGE_TRANSITION` — newer GitHub evidence says merged but TRACE latest lifecycle evidence does not;
+- `TRACE_COVERAGE_GAP` — GitHub snapshot includes a PR but TRACE has no PR lifecycle record;
+- `MISSING_MERGE_TRANSITION` — a sufficiently newer GitHub snapshot says merged but TRACE latest lifecycle evidence does not;
 - `SOURCE_CONFLICT` — comparable point-in-time source evidence disagrees;
+- `STATE_FRESHNESS_UNKNOWN` — source states differ but their observation order cannot be established;
 - `CLAIM_CONFLICT` — a derived lifecycle claim is unsupported by a sufficiently new GitHub snapshot;
-- `CLAIM_UNCHECKED` — snapshot is missing, older than the claim, or does not establish the required state.
+- `CLAIM_UNCHECKED` — snapshot is missing, older than the claim, has unknown state, or cannot be ordered against the claim.
 
 These are evidence findings, not merge/veto decisions.
 
@@ -114,12 +118,14 @@ The profile must demonstrate all of the following:
 
 1. open PR with non-null `merge_commit_sha` remains OPEN;
 2. closed-unmerged remains distinct from merged;
-3. GitHub says merged after TRACE only captured PR creation -> `MISSING_MERGE_TRANSITION`;
+3. newer GitHub evidence says merged after TRACE only captured PR creation -> `MISSING_MERGE_TRANSITION`;
 4. PR present in GitHub evaluation set but absent from TRACE -> `TRACE_COVERAGE_GAP`;
-5. human/derived `MERGED_TO_TARGET(main)` claim vs open PR -> `CLAIM_CONFLICT`;
+5. ordered human/derived `MERGED_TO_TARGET(main)` claim vs open PR -> `CLAIM_CONFLICT`;
 6. older GitHub snapshot does not refute a newer TRACE merge observation;
 7. retrospective later ingest does not outrank a newer event merely because `source_order` is larger;
-8. snapshot older than a lifecycle claim -> `CLAIM_UNCHECKED`, not conflict.
+8. snapshot older than a lifecycle claim -> `CLAIM_UNCHECKED`;
+9. missing freshness does not create `SOURCE_CONFLICT`; it yields `STATE_FRESHNESS_UNKNOWN`;
+10. claim and snapshot with no timestamp/order relationship -> `CLAIM_UNCHECKED`.
 
 ## Non-goals
 

@@ -1,5 +1,6 @@
 {
   "observed_at": "2026-08-16T20:14:00+09:00",
+  "capture_order": 2,
   "source": "GitHub connector point-in-time PR metadata",
   "prs": [
     {

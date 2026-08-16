@@ -6,10 +6,10 @@ from tools.pr_lifecycle_reconcile import reconcile
 class ReconcileTests(unittest.TestCase):
     def test_actual_shape_distinguishes_open_from_merged_even_with_merge_commit_sha(self):
         trace = [
-            {"record_id": "r1", "source_order": 1, "payload": {"event": "PR_CREATED", "repository": "nobutakayamauchi/WebAI-Bridge", "pr": 7}},
-            {"record_id": "r2", "source_order": 2, "payload": {"event": "PR_CREATED", "repository": "nobutakayamauchi/WebAI-Bridge", "pr": 9}},
+            {"record_id": "r1", "source_order": 1, "captured_at": "2026-08-16T20:00:00+09:00", "payload": {"event": "PR_CREATED", "repository": "nobutakayamauchi/WebAI-Bridge", "pr": 7}},
+            {"record_id": "r2", "source_order": 2, "captured_at": "2026-08-16T20:00:00+09:00", "payload": {"event": "PR_CREATED", "repository": "nobutakayamauchi/WebAI-Bridge", "pr": 9}},
         ]
-        github = {"prs": [
+        github = {"observed_at": "2026-08-16T20:10:00+09:00", "prs": [
             {"repository": "nobutakayamauchi/WebAI-Bridge", "pr": 7, "state": "open", "merged": False, "base": "main", "merge_commit_sha": "synthetic-test-merge"},
             {"repository": "nobutakayamauchi/WebAI-Bridge", "pr": 9, "state": "closed", "merged": True, "base": "main", "merge_commit_sha": "real-merge"},
         ]}
@@ -28,7 +28,8 @@ class ReconcileTests(unittest.TestCase):
         github = {"prs": [
             {"repository": "r/x", "pr": 7, "state": "open", "merged": False, "base": "main"}
         ]}
-        claims = [{"repository": "r/x", "pr": 7, "claim": "MERGED_TO_TARGET", "target_branch": "main", "source_ref": "human-message"}]
+        claims = [{"repository": "r/x", "pr": 7, "claim": "MERGED_TO_TARGET", "target_branch": "main", "source_ref": "human-message", "capture_order": 1}]
+        github["capture_order"] = 2
         result = reconcile([], github, claims)
         self.assertTrue(any(f["type"] == "CLAIM_CONFLICT" for f in result["findings"]))
 
@@ -36,13 +37,14 @@ class ReconcileTests(unittest.TestCase):
         github = {"prs": [
             {"repository": "r/x", "pr": 9, "state": "closed", "merged": True, "base": "main"}
         ]}
-        claims = [{"repository": "r/x", "pr": 9, "claim": "MERGED_TO_TARGET", "target_branch": "main"}]
+        claims = [{"repository": "r/x", "pr": 9, "claim": "MERGED_TO_TARGET", "target_branch": "main", "capture_order": 1}]
+        github["capture_order"] = 2
         result = reconcile([], github, claims)
         self.assertFalse(any(f["type"] == "CLAIM_CONFLICT" for f in result["findings"]))
 
     def test_closed_without_merged_is_not_merge(self):
-        trace = [{"record_id": "r1", "source_order": 1, "payload": {"event": "MERGE_RECORDED", "repository": "r/x", "pr": 4}}]
-        github = {"prs": [{"repository": "r/x", "pr": 4, "state": "closed", "merged": False, "base": "main"}]}
+        trace = [{"record_id": "r1", "source_order": 1, "captured_at": "2026-08-16T20:00:00+09:00", "payload": {"event": "MERGE_RECORDED", "repository": "r/x", "pr": 4}}]
+        github = {"observed_at": "2026-08-16T20:10:00+09:00", "prs": [{"repository": "r/x", "pr": 4, "state": "closed", "merged": False, "base": "main"}]}
         result = reconcile(trace, github)
         self.assertTrue(any(f["type"] == "SOURCE_CONFLICT" for f in result["findings"]))
 
@@ -73,6 +75,20 @@ class ReconcileTests(unittest.TestCase):
             {"repository": "r/x", "pr": 7, "state": "open", "merged": False, "base": "main"}
         ]}
         claims = [{"repository": "r/x", "pr": 7, "claim": "MERGED_TO_TARGET", "target_branch": "main", "claimed_at": "2026-08-16T20:20:00+09:00"}]
+        result = reconcile([], github, claims)
+        self.assertTrue(any(f["type"] == "CLAIM_UNCHECKED" for f in result["findings"]))
+        self.assertFalse(any(f["type"] == "CLAIM_CONFLICT" for f in result["findings"]))
+
+    def test_missing_freshness_does_not_create_source_conflict(self):
+        trace = [{"record_id": "r1", "source_order": 1, "payload": {"event": "MERGE_RECORDED", "repository": "r/x", "pr": 4}}]
+        github = {"prs": [{"repository": "r/x", "pr": 4, "state": "open", "merged": False, "base": "main"}]}
+        result = reconcile(trace, github)
+        self.assertTrue(any(f["type"] == "STATE_FRESHNESS_UNKNOWN" for f in result["findings"]))
+        self.assertFalse(any(f["type"] == "SOURCE_CONFLICT" for f in result["findings"]))
+
+    def test_claim_without_time_or_order_is_unchecked(self):
+        github = {"prs": [{"repository": "r/x", "pr": 7, "state": "open", "merged": False, "base": "main"}]}
+        claims = [{"repository": "r/x", "pr": 7, "claim": "MERGED_TO_TARGET", "target_branch": "main"}]
         result = reconcile([], github, claims)
         self.assertTrue(any(f["type"] == "CLAIM_UNCHECKED" for f in result["findings"]))
         self.assertFalse(any(f["type"] == "CLAIM_CONFLICT" for f in result["findings"]))

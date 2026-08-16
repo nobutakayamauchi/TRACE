@@ -96,6 +96,36 @@ def _snapshot_state(snapshot: dict[str, Any]) -> str:
     return "UNKNOWN"
 
 
+def _ordering(snapshot_time: datetime | None, trace_time: datetime | None) -> str:
+    if snapshot_time is None or trace_time is None:
+        return "UNKNOWN"
+    if snapshot_time > trace_time:
+        return "SNAPSHOT_NEWER"
+    if snapshot_time == trace_time:
+        return "SAME_TIME"
+    return "SNAPSHOT_OLDER"
+
+
+def _claim_ordering(claim: dict[str, Any], snapshot: dict[str, Any], github_snapshot: dict[str, Any]) -> str:
+    claim_time = _parse_time(claim.get("claimed_at"))
+    snapshot_time = _parse_time(snapshot.get("observed_at") or github_snapshot.get("observed_at"))
+    if claim_time is not None and snapshot_time is not None:
+        if snapshot_time > claim_time:
+            return "SNAPSHOT_NEWER"
+        if snapshot_time == claim_time:
+            return "SAME_TIME"
+        return "SNAPSHOT_OLDER"
+    claim_order = claim.get("capture_order")
+    snapshot_order = snapshot.get("capture_order", github_snapshot.get("capture_order"))
+    if isinstance(claim_order, int) and isinstance(snapshot_order, int):
+        if snapshot_order > claim_order:
+            return "SNAPSHOT_NEWER"
+        if snapshot_order == claim_order:
+            return "SAME_TIME"
+        return "SNAPSHOT_OLDER"
+    return "UNKNOWN"
+
+
 def reconcile(
     trace_records: Iterable[dict[str, Any]],
     github_snapshot: dict[str, Any],
@@ -157,7 +187,19 @@ def reconcile(
             continue
         trace_time, _, trace_state, record_id = trace
         snapshot_time = _parse_time(snapshot.get("observed_at") or github_snapshot.get("observed_at"))
-        snapshot_can_supersede = snapshot_time is None or trace_time is None or snapshot_time >= trace_time
+        ordering = _ordering(snapshot_time, trace_time)
+        if ordering == "UNKNOWN" and github_state != trace_state:
+            findings.append({
+                "type": "STATE_FRESHNESS_UNKNOWN",
+                "repository": key.repository,
+                "pr": key.pr,
+                "trace_state": trace_state,
+                "github_state": github_state,
+                "trace_record_id": record_id,
+                "message": "State differs but observation freshness cannot be ordered; preserve UNKNOWN instead of declaring conflict.",
+            })
+            continue
+        snapshot_can_supersede = ordering in {"SNAPSHOT_NEWER", "SAME_TIME"}
         if snapshot_can_supersede and github_state == "MERGED" and trace_state != "MERGED":
             findings.append({
                 "type": "MISSING_MERGE_TRANSITION",
@@ -199,9 +241,8 @@ def reconcile(
         target_branch = claim.get("target_branch")
         github_state = _snapshot_state(snapshot)
         if claim_value == "MERGED_TO_TARGET":
-            claim_time = _parse_time(claim.get("claimed_at"))
-            snapshot_time = _parse_time(snapshot.get("observed_at") or github_snapshot.get("observed_at"))
-            if claim_time is not None and snapshot_time is not None and snapshot_time < claim_time:
+            claim_ordering = _claim_ordering(claim, snapshot, github_snapshot)
+            if claim_ordering == "SNAPSHOT_OLDER":
                 findings.append({
                     "type": "CLAIM_UNCHECKED",
                     "repository": key.repository,
@@ -209,6 +250,16 @@ def reconcile(
                     "claim": claim_value,
                     "source_ref": claim.get("source_ref"),
                     "message": "GitHub snapshot predates the lifecycle claim and cannot refute it.",
+                })
+                continue
+            if claim_ordering == "UNKNOWN":
+                findings.append({
+                    "type": "CLAIM_UNCHECKED",
+                    "repository": key.repository,
+                    "pr": key.pr,
+                    "claim": claim_value,
+                    "source_ref": claim.get("source_ref"),
+                    "message": "Claim and GitHub snapshot cannot be ordered in time; preserve UNKNOWN.",
                 })
                 continue
             if github_state == "UNKNOWN":
