@@ -141,6 +141,25 @@ If auditability is mandatory for a frozen workload, that workload may explicitly
 - the first seal has been created; records `r1-r25` are the frozen first-seal prefix;
 - post-seal observations append after `r25` and must not rewrite that prefix.
 
+## Rotation measurement profile
+
+When the workload needs actual Ultimate Loop speed/rotation measurement, use `LOOP_ROTATION_MEASUREMENT_V0.md` rather than inferring cycles from commits or PRs.
+
+The measurement profile adds a bounded live spine:
+
+- stable run/event/span identities;
+- explicit outer `LOOP_ITERATION` spans;
+- per-workstream cycle sequence;
+- optional material inner-stage spans;
+- finding/reopen causal edges;
+- complete-run vs observed-window boundaries;
+- explicit external waits;
+- fail-closed data-quality output.
+
+It deliberately does **not** require hidden reasoning, every token, every tool call or full command/stdout capture.
+
+Historical run `0002` remains insufficient for an exact rotation-rate claim because that spine was not captured live. The new profile is prospective instrumentation, not permission to invent past cycles.
+
 Ultimate Loop canonical method repository:
 
 - https://github.com/nobutakayamauchi/Ultimate-Loop
