@@ -39,11 +39,51 @@ The record is an interpretation, metric, summary, causal reconstruction, or clas
 
 `DERIVED != SOURCE EVIDENCE`
 
+## Source-event semantics
+
+Source records must say only what the source itself establishes.
+
+Examples:
+
+```text
+GITHUB MERGE/COMMIT EVIDENCE -> MERGE_RECORDED / CHANGE_RECORDED
+ULTIMATE LOOP PROMOTION CLAIM -> DERIVED DECISION RECORD WITH SOURCE REFERENCES
+```
+
+A commit existing on a branch does not by itself prove that a candidate won METEOR, that a deployment became correct, or that a human approved a semantic promotion.
+
+GitHub records must identify the repository as well as the SHA. SHA without repository context is insufficient for durable reconstruction.
+
+When the source actor is not established, actor remains null/UNKNOWN instead of being invented as `system`, `human`, or an AI identity.
+
 ## Minimum Ultimate Loop events
 
 Recommended event types:
 
 `RUN_STARTED`, `GOAL_FROZEN`, `DISCOVERY_FOUND`, `GATE_ENTERED`, `GATE_PASSED`, `GATE_FAILED`, `FINDING_OPENED`, `FINDING_REJECTED`, `FINDING_RESOLVED`, `COUNTER_DA_RESULT`, `INVARIANT_ADDED`, `TEST_ADDED`, `TEST_RESULT`, `CHANGE_APPLIED`, `COMMIT_CREATED`, `PR_CREATED`, `PR_MERGED`, `DEPLOYMENT_IDENTITY`, `HUMAN_DECISION`, `HUMAN_OVERRIDE`, `UNKNOWN_PRESERVED`, `CONFLICT_PRESERVED`, `EXTERNAL_EVIDENCE_REQUIRED`, `RUN_STOPPED`.
+
+## Build / seal lifecycle
+
+A new run may need to ingest retrospective evidence before the initial archive is stable. TRACE therefore distinguishes construction from sealed evidence.
+
+```text
+BUILDING
+→ validate sources / ordering / hashes
+→ FIRST SEAL
+→ APPEND-ONLY
+```
+
+Rules:
+
+1. While `BUILDING`, an initial event set may be regenerated to correct capture/schema mistakes.
+2. A BUILDING manifest is not an authoritative integrity seal.
+3. The first `SEALED` manifest freezes all existing event records.
+4. After first seal, existing records must not be edited, reordered, or deleted in normal operation.
+5. Post-seal corrections are new append-only records that cite the record being corrected.
+6. Re-sealing after append updates the head hash but never rewrites the already sealed prefix.
+7. Git history may preserve pre-seal drafts, but those drafts must not be presented as the sealed TRACE record.
+
+This boundary prevents bootstrap cleanup from being mislabeled as append-only preservation.
 
 ## v0 hash profile
 
@@ -78,8 +118,9 @@ If auditability is mandatory for a frozen workload, that workload may explicitly
 - repository history before observer attachment is retrospective;
 - the human directive to attach TRACE marks the live observation boundary;
 - GitHub evidence is preserved as source-backed records;
-- test-count growth and other summaries are derived records;
-- external runtime facts remain unproven until separately observed.
+- test-count growth and promotion interpretations are derived records, not GitHub source facts;
+- external runtime facts remain unproven until separately observed;
+- the run remains `BUILDING` until its first explicit seal.
 
 Ultimate Loop canonical method repository:
 
