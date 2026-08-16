@@ -85,6 +85,24 @@ Rules:
 
 This boundary prevents bootstrap cleanup from being mislabeled as append-only preservation.
 
+## Observer self-reference boundary
+
+TRACE must not create an infinite recursion by requiring every integrity-maintenance write to be recorded inside the same event chain that write changes.
+
+```text
+APPEND EVENT
+→ UPDATE SEAL
+→ MUST APPEND "SEAL UPDATED"
+→ UPDATE SEAL
+→ ...
+```
+
+is forbidden as a mandatory rule.
+
+Seal/reseal metadata is integrity metadata about the chain, not automatically a workload event inside that same chain. Git history or a separate seal lineage may preserve those maintenance operations when useful.
+
+During dogfood, material observer implementation changes may still be recorded as ordinary events. The act of updating the manifest solely to seal the new head does not itself require another event in the same chain.
+
 ## v0 hash profile
 
 For the first dogfood run, records use SHA-256 over UTF-8 canonical JSON:
@@ -120,7 +138,8 @@ If auditability is mandatory for a frozen workload, that workload may explicitly
 - GitHub evidence is preserved as source-backed records;
 - test-count growth and promotion interpretations are derived records, not GitHub source facts;
 - external runtime facts remain unproven until separately observed;
-- the run remains `BUILDING` until its first explicit seal.
+- the first seal has been created; records `r1-r25` are the frozen first-seal prefix;
+- post-seal observations append after `r25` and must not rewrite that prefix.
 
 Ultimate Loop canonical method repository:
 
