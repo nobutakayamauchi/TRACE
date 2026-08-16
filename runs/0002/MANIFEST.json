@@ -1,21 +1,30 @@
 {
   "run_id": "UL-TRACE-2026-08-16-0002",
   "subject": "Ultimate Loop TRACE attachment during WebAI-Bridge dogfood",
+  "status": "SEALED",
   "capture_mode": "RETROSPECTIVE_THEN_LIVE",
   "captured_at": "2026-08-16T20:02:00+09:00",
-  "record_count": 10,
-  "events_sha256": "d35eb48ad03e040c17d072fb3e7520b1a58271305ed89caf58021c5b9eee7ef1",
-  "head_record_hash": "056c42f16c721d0590ebc72b589e8ed7913a90f45ef001c71c4f730681298ef9",
+  "first_sealed_at": "2026-08-16T20:09:39+09:00",
+  "record_count": 25,
+  "events_sha256": "846491a55b4d21f2a6cf3c5c8048e9c03a28eedcc03c8095ae2829eee79af0a5",
+  "head_record_hash": "31cc5700fe634b5b7e7120aff54adb2e72e5570c4fb5ecadb76d5f4f479ad81e",
+  "sealed_prefix_last_record": "r25",
+  "events_file_commit_at_first_seal": "b56583bd0087da8f2439757135b1f0b1dd91008e",
   "hash_profile": "TRACE-UL-v0: SHA-256 over UTF-8 canonical JSON with sorted keys and compact separators; record_hash excludes record_hash itself; previous_record_hash chains records.",
   "live_boundary": {
     "record_id": "r9",
     "meaning": "The human directive to attach TRACE is captured from the current visible conversation. Earlier records are retrospective reconstructions from surviving evidence."
+  },
+  "seal_rule": {
+    "before_first_seal": "BUILDING records may be regenerated to correct capture/schema errors and are not authoritative seals.",
+    "after_first_seal": "Records r1-r25 are frozen. Future observations append new records; corrections cite prior records rather than editing them."
   },
   "limitations": [
     "Pre-attachment records are reconstructed and are not claimed as live TRACE observations.",
     "GitHub evidence does not expose hidden model reasoning.",
     "Passing tests do not independently prove production correctness.",
     "The current visible chat capture is not independently timestamp-notarized.",
-    "Real host, TLS, provider, buyer entitlement and iPhone evidence remain external to the reconstructed code history."
+    "Real host, TLS, provider, buyer entitlement and iPhone evidence remain external to the reconstructed code history.",
+    "This SHA-256 chain proves internal consistency of the captured archive, not independent third-party notarization."
   ]
 }
