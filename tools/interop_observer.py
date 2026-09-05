@@ -40,12 +40,7 @@ def _human_actor_evidence(envelope: dict[str, Any]) -> str | None:
         if not isinstance(ref, dict):
             continue
         identity = ref.get("identity") or {}
-        if (
-            ref.get("kind") == "human_identity_evidence"
-            and isinstance(identity, dict)
-            and identity.get("actor") == approved_by
-            and identity.get("verified") is True
-        ):
+        if ref.get("kind") == "human_identity_evidence" and isinstance(identity, dict) and identity.get("actor") == approved_by and identity.get("verified") is True:
             return approved_by
     return None
 
@@ -97,14 +92,17 @@ def _validate_envelope(envelope: dict[str, Any]) -> None:
             raise ValueError(f"{artifact_type} requires immutable target_identity")
 
 
-def _durable_payload_reference(envelope: dict[str, Any]) -> dict[str, Any] | None:
+def _durable_payload_reference(envelope: dict[str, Any], *, payload_sha256: str) -> dict[str, Any] | None:
+    """Accept only an immutable content-addressed reference bound to this exact payload."""
     for ref in envelope.get("evidence_refs") or []:
-        if isinstance(ref, dict) and ref.get("kind") in {
-            "content_addressed_artifact",
-            "connector_raw_reference",
-            "source_file",
-            "github_blob",
-        } and ref.get("ref"):
+        if not isinstance(ref, dict):
+            continue
+        if (
+            ref.get("kind") == "content_addressed_artifact"
+            and isinstance(ref.get("ref"), str)
+            and ref.get("ref")
+            and ref.get("digest") == payload_sha256
+        ):
             return ref
     return None
 
@@ -116,11 +114,7 @@ def observe_interop_envelope(
     observer_commit: str,
     captured_at: str | None = None,
 ) -> dict[str, Any]:
-    """Convert one artifact into a passive TRACE source-record candidate.
-
-    This is observation preparation, not archival append. Missing durable source
-    content is preserved as a reconstruction gap rather than mislabeled SUPPORTED.
-    """
+    """Convert one artifact into a passive TRACE source-record candidate, never archived truth."""
     _validate_envelope(envelope)
     if not isinstance(observer_runtime_identity, dict) or not observer_runtime_identity:
         raise ValueError("observer runtime identity is required")
@@ -131,17 +125,14 @@ def observe_interop_envelope(
     producer = dict(envelope.get("producer") or {})
     subject = dict(envelope.get("subject") or {})
     payload = dict(envelope.get("payload") or {})
-    durable_ref = _durable_payload_reference(envelope)
+    payload_sha = _sha256(payload)
+    durable_ref = _durable_payload_reference(envelope, payload_sha256=payload_sha)
     human_actor = _human_actor_evidence(envelope) if artifact_type == "APPROVAL" else None
     reconstructable = durable_ref is not None
 
     observation_payload = {
         "event": _event_for(envelope),
-        "observer_identity": {
-            "repository": TRACE_REPOSITORY,
-            "commit": observer_commit,
-            "runtime_identity": observer_runtime_identity,
-        },
+        "observer_identity": {"repository": TRACE_REPOSITORY, "commit": observer_commit, "runtime_identity": observer_runtime_identity},
         "interop": {
             "contract_version": CONTRACT_VERSION,
             "artifact_type": artifact_type,
@@ -155,7 +146,7 @@ def observe_interop_envelope(
             "authorization_refs": list(envelope.get("authorization_refs") or []),
             "evidence_refs": list(envelope.get("evidence_refs") or []),
             "intended_consumers": list(envelope.get("intended_consumers") or []),
-            "payload_sha256": _sha256(payload),
+            "payload_sha256": payload_sha,
             "envelope_sha256": _sha256(envelope),
             "durable_payload_ref": durable_ref,
             "reconstruction_gap": not reconstructable,
@@ -181,14 +172,7 @@ def observe_interop_envelope(
     }
 
 
-def seal_source_record_candidate(
-    candidate: dict[str, Any],
-    *,
-    record_id: str,
-    source_order: int,
-    previous_record_hash: str | None,
-) -> dict[str, Any]:
-    """Assign deterministic TRACE chain fields without claiming archive persistence."""
+def seal_source_record_candidate(candidate: dict[str, Any], *, record_id: str, source_order: int, previous_record_hash: str | None) -> dict[str, Any]:
     if not record_id:
         raise ValueError("record_id is required")
     if source_order < 1:
@@ -221,28 +205,23 @@ def trace_envelope_from_record_candidate(
     """Publish only a PROPOSED TRACE candidate until the archive owner appends/reseals it."""
     if not observer_runtime_identity or not observer_commit:
         raise ValueError("observer deployment identity is required")
-    source_digest = record["payload"]["interop"]["envelope_sha256"]
+    interop = record["payload"]["interop"]
+    hashed_artifact_id = interop["artifact_id"]
+    hashed_repository = interop["producer"]["repository"]
+    if source_artifact_id != hashed_artifact_id or source_repository != hashed_repository:
+        raise ValueError("TRACE source arguments do not match the hashed observed artifact")
+    source_digest = interop["envelope_sha256"]
     return {
         "contract_version": CONTRACT_VERSION,
         "artifact_type": "TRACE",
         "artifact_id": f"trace-candidate:{record['record_id']}:{record['record_hash'][:16]}",
         "created_at": record["captured_at"],
-        "producer": {
-            "repository": TRACE_REPOSITORY,
-            "component": "tools.interop_observer",
-            "commit": observer_commit,
-            "runtime_identity": observer_runtime_identity,
-        },
+        "producer": {"repository": TRACE_REPOSITORY, "component": "tools.interop_observer", "commit": observer_commit, "runtime_identity": observer_runtime_identity},
         "subject": {
             "unit_id": None,
-            "target_artifact_id": source_artifact_id,
-            "target_identity": {
-                "repository": source_repository,
-                "artifact_id": source_artifact_id,
-                "sha256": source_digest,
-                "commit": None,
-            },
-            "parent_artifact_ids": [source_artifact_id],
+            "target_artifact_id": hashed_artifact_id,
+            "target_identity": {"repository": hashed_repository, "artifact_id": hashed_artifact_id, "sha256": source_digest, "commit": None},
+            "parent_artifact_ids": [hashed_artifact_id],
         },
         "intended_consumers": [],
         "state": "PROPOSED",
@@ -263,5 +242,4 @@ def trace_envelope_from_record_candidate(
     }
 
 
-# Compatibility name retained for callers during the draft migration.
 trace_envelope_from_record = trace_envelope_from_record_candidate
