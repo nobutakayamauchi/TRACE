@@ -89,11 +89,11 @@ class InteropObserverTests(unittest.TestCase):
         }
         source["evidence_refs"] = [ref]
 
-        no_resolver = observe(source)
-        self.assertEqual(no_resolver["uncertainty"], "UNKNOWN")
-
-        wrong_bytes = observe(source, resolver=lambda _: {"different": "payload"})
-        self.assertEqual(wrong_bytes["uncertainty"], "UNKNOWN")
+        self.assertEqual(observe(source)["uncertainty"], "UNKNOWN")
+        self.assertEqual(
+            observe(source, resolver=lambda _: {"different": "payload"})["uncertainty"],
+            "UNKNOWN",
+        )
 
         verified = observe(source, resolver=lambda _: source["payload"])
         self.assertEqual(verified["uncertainty"], "SUPPORTED")
@@ -116,17 +116,22 @@ class InteropObserverTests(unittest.TestCase):
     def test_claimed_human_identity_without_trusted_verifier_is_not_human_decision(self):
         approval = envelope(
             artifact_type="APPROVAL",
-            payload={"decision": "APPROVE", "approved_by": "human-1"},
+            payload={"decision": "APPROVE", "approved_by_asserted": "human-1"},
             evidence_refs=[{"kind": "human_identity_evidence", "ref": "human-session:1"}],
         )
         candidate = observe(approval)
         self.assertEqual(candidate["payload"]["event"], "APPROVAL_ARTIFACT_OBSERVED")
+        self.assertEqual(candidate["payload"]["approved_by_asserted"], "human-1")
         self.assertIsNone(candidate["actor"])
 
-    def test_trusted_human_verifier_can_emit_human_decision(self):
+    def test_trusted_human_verifier_can_emit_human_decision_for_decision_record(self):
         approval = envelope(
             artifact_type="APPROVAL",
-            payload={"decision": "APPROVE", "approved_by": "human-1"},
+            payload={
+                "decision": "APPROVE",
+                "approved_by_asserted": "human-1",
+                "authority_pending_verification": True,
+            },
             evidence_refs=[{"kind": "human_identity_evidence", "ref": "human-session:1"}],
         )
         candidate = observe(
@@ -139,12 +144,7 @@ class InteropObserverTests(unittest.TestCase):
     def test_preappend_trace_is_proposed_and_provenance_bound(self):
         source = envelope()
         candidate = observe(source)
-        record = seal_source_record_candidate(
-            candidate,
-            record_id="r1",
-            source_order=1,
-            previous_record_hash=None,
-        )
+        record = seal_source_record_candidate(candidate, record_id="r1", source_order=1, previous_record_hash=None)
         trace = trace_envelope_from_record(
             record,
             source_artifact_id=source["artifact_id"],
@@ -165,14 +165,32 @@ class InteropObserverTests(unittest.TestCase):
                 observer_commit=OBSERVER_COMMIT,
             )
 
+    def test_trace_derivation_must_match_sealed_observer_identity(self):
+        source = envelope()
+        record = seal_source_record_candidate(
+            observe(source), record_id="r1", source_order=1, previous_record_hash=None
+        )
+        with self.assertRaises(PermissionError):
+            trace_envelope_from_record(
+                record,
+                source_artifact_id=source["artifact_id"],
+                source_repository=source["producer"]["repository"],
+                observer_runtime_identity={"service": "other"},
+                observer_commit=OBSERVER_COMMIT,
+            )
+        with self.assertRaises(PermissionError):
+            trace_envelope_from_record(
+                record,
+                source_artifact_id=source["artifact_id"],
+                source_repository=source["producer"]["repository"],
+                observer_runtime_identity=OBSERVER_ID,
+                observer_commit="different-commit",
+            )
+
     def test_mutated_sealed_record_is_rejected_before_trace_derivation(self):
         source = envelope()
-        candidate = observe(source)
         record = seal_source_record_candidate(
-            candidate,
-            record_id="r1",
-            source_order=1,
-            previous_record_hash=None,
+            observe(source), record_id="r1", source_order=1, previous_record_hash=None
         )
         record["payload"]["interop"]["artifact_id"] = "tampered"
         with self.assertRaises(PermissionError):
@@ -193,9 +211,7 @@ class InteropObserverTests(unittest.TestCase):
     def test_missing_observer_identity_or_authority_vector_fails_closed(self):
         with self.assertRaises(ValueError):
             observe_interop_envelope(
-                envelope(),
-                observer_runtime_identity={},
-                observer_commit=OBSERVER_COMMIT,
+                envelope(), observer_runtime_identity={}, observer_commit=OBSERVER_COMMIT
             )
         bad = envelope()
         del bad["authority"]
