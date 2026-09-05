@@ -20,12 +20,7 @@ _ARTIFACT_EVENTS = {
 
 
 def _canonical_json(value: Any) -> bytes:
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def _snapshot(value: Any) -> Any:
@@ -40,6 +35,12 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _asserted_approval_actor(envelope: dict[str, Any]) -> str | None:
+    payload = envelope.get("payload") or {}
+    actor = payload.get("approved_by_asserted") or payload.get("approved_by")
+    return actor if isinstance(actor, str) and actor else None
+
+
 def _human_actor_evidence(
     envelope: dict[str, Any],
     *,
@@ -48,9 +49,8 @@ def _human_actor_evidence(
     """Return a human actor only when a trusted verifier confirms the evidence ref."""
     if verifier is None:
         return None
-    payload = envelope.get("payload") or {}
-    approved_by = payload.get("approved_by")
-    if not isinstance(approved_by, str) or not approved_by:
+    approved_by = _asserted_approval_actor(envelope)
+    if not approved_by:
         return None
     for ref in envelope.get("evidence_refs") or []:
         if not isinstance(ref, dict) or ref.get("kind") != "human_identity_evidence":
@@ -83,16 +83,8 @@ def _validate_envelope(envelope: dict[str, Any]) -> None:
     if envelope.get("contract_version") != CONTRACT_VERSION:
         raise ValueError("unsupported interop contract version")
     allowed = {
-        "UNIT",
-        "RESULT",
-        "EVIDENCE",
-        "GATE_RESULT",
-        "RETRY_REQUEST",
-        "APPROVAL",
-        "TRACE",
-        "LEARNING_CANDIDATE",
-        "PROMOTION_DECISION",
-        "FREEZE_RECORD",
+        "UNIT", "RESULT", "EVIDENCE", "GATE_RESULT", "RETRY_REQUEST",
+        "APPROVAL", "TRACE", "LEARNING_CANDIDATE", "PROMOTION_DECISION", "FREEZE_RECORD",
     }
     artifact_type = envelope.get("artifact_type")
     if artifact_type not in allowed:
@@ -124,7 +116,6 @@ def _verified_payload_reference(
     payload_sha256: str,
     resolver: Callable[[dict[str, Any]], Any | None] | None,
 ) -> dict[str, Any] | None:
-    """Accept a content-addressed ref only after resolving and hash-verifying its bytes/value."""
     if resolver is None:
         return None
     for ref in envelope.get("evidence_refs") or []:
@@ -141,9 +132,7 @@ def _verified_payload_reference(
             resolved = resolver(ref)
         except Exception:
             continue
-        if resolved is None:
-            continue
-        if _sha256(resolved) == payload_sha256:
+        if resolved is not None and _sha256(resolved) == payload_sha256:
             return _snapshot(ref)
     return None
 
@@ -209,7 +198,7 @@ def observe_interop_envelope(
     }
     if artifact_type == "APPROVAL":
         observation_payload["decision"] = payload.get("decision")
-        observation_payload["approved_by_asserted"] = payload.get("approved_by")
+        observation_payload["approved_by_asserted"] = _asserted_approval_actor(envelope)
         observation_payload["human_actor_established"] = human_actor is not None
     elif artifact_type == "RESULT":
         observation_payload["result_status"] = payload.get("status")
@@ -276,9 +265,17 @@ def trace_envelope_from_record_candidate(
     observer_commit: str,
 ) -> dict[str, Any]:
     """Publish only a PROPOSED TRACE candidate until the archive owner appends/reseals it."""
-    if not observer_runtime_identity or not observer_commit:
+    if not isinstance(observer_runtime_identity, dict) or not observer_runtime_identity or not observer_commit:
         raise ValueError("observer deployment identity is required")
     _verify_sealed_candidate_record(record)
+    record_observer = record["payload"].get("observer_identity") or {}
+    if (
+        record_observer.get("repository") != TRACE_REPOSITORY
+        or record_observer.get("commit") != observer_commit
+        or record_observer.get("runtime_identity") != _snapshot(observer_runtime_identity)
+    ):
+        raise PermissionError("TRACE derivation identity does not match the sealed observer identity")
+
     interop = record["payload"]["interop"]
     hashed_artifact_id = interop["artifact_id"]
     hashed_repository = interop["producer"]["repository"]
