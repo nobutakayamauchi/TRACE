@@ -1,0 +1,23 @@
+contract_version: rts-interop/v1
+repository: nobutakayamauchi/TRACE
+role: passive_evidence_observer
+produces:
+  - TRACE
+consumes:
+  - UNIT
+  - RESULT
+  - EVIDENCE
+  - GATE_RESULT
+  - RETRY_REQUEST
+  - APPROVAL
+  - TRACE
+  - LEARNING_CANDIDATE
+  - PROMOTION_DECISION
+  - FREEZE_RECORD
+boundary: cross_repository_observation_only
+authority:
+  execution: false
+  external_action: false
+  promotion: false
+archive_write:
+  sealed_run_direct_append: false
