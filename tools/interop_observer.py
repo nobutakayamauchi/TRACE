@@ -104,10 +104,10 @@ def _verified_payload_reference(envelope: dict[str, Any], *, payload_sha256: str
             continue
         try:
             resolved = resolver(_snapshot(retained_ref))
+            if resolved is not None and _sha256(resolved) == payload_sha256:
+                return retained_ref
         except Exception:
             continue
-        if resolved is not None and _sha256(resolved) == payload_sha256:
-            return retained_ref
     return None
 
 
