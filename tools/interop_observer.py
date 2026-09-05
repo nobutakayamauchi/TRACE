@@ -50,7 +50,7 @@ def _human_actor_evidence(envelope: dict[str, Any], *, verifier: Callable[[dict[
             continue
         ref_snapshot = _snapshot(ref)
         try:
-            if verifier(ref_snapshot, actor, envelope_digest) is True:
+            if verifier(_snapshot(ref_snapshot), actor, envelope_digest) is True:
                 return actor
         except Exception:
             continue
@@ -99,15 +99,15 @@ def _verified_payload_reference(envelope: dict[str, Any], *, payload_sha256: str
     for ref in envelope.get("evidence_refs") or []:
         if not isinstance(ref, dict):
             continue
-        ref_snapshot = _snapshot(ref)
-        if ref_snapshot.get("kind") != "content_addressed_artifact" or ref_snapshot.get("ref") != immutable_ref or ref_snapshot.get("digest") != payload_sha256:
+        retained_ref = _snapshot(ref)
+        if retained_ref.get("kind") != "content_addressed_artifact" or retained_ref.get("ref") != immutable_ref or retained_ref.get("digest") != payload_sha256:
             continue
         try:
-            resolved = resolver(ref_snapshot)
+            resolved = resolver(_snapshot(retained_ref))
         except Exception:
             continue
         if resolved is not None and _sha256(resolved) == payload_sha256:
-            return ref_snapshot
+            return retained_ref
     return None
 
 
