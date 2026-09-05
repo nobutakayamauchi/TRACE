@@ -115,38 +115,40 @@ def observe_interop_envelope(envelope: dict[str, Any], *, observer_runtime_ident
                              payload_ref_resolver: Callable[[dict[str, Any]], Any | None] | None = None,
                              human_identity_verifier: Callable[[dict[str, Any], str, str], bool] | None = None,
                              captured_at: str | None = None) -> dict[str, Any]:
-    _validate_envelope(envelope)
+    envelope_snapshot = _snapshot(envelope)
+    _validate_envelope(envelope_snapshot)
     if not isinstance(observer_runtime_identity, dict) or not observer_runtime_identity or not observer_commit:
         raise ValueError("observer deployment identity is required")
-    artifact_type = str(envelope["artifact_type"])
-    producer = _snapshot(envelope.get("producer") or {})
-    subject = _snapshot(envelope.get("subject") or {})
-    payload = _snapshot(envelope.get("payload") or {})
+    artifact_type = str(envelope_snapshot["artifact_type"])
+    producer = _snapshot(envelope_snapshot.get("producer") or {})
+    subject = _snapshot(envelope_snapshot.get("subject") or {})
+    payload = _snapshot(envelope_snapshot.get("payload") or {})
     payload_sha = _sha256(payload)
-    durable_ref = _verified_payload_reference(envelope, payload_sha256=payload_sha, resolver=payload_ref_resolver)
-    human_actor = _human_actor_evidence(envelope, verifier=human_identity_verifier) if artifact_type == "APPROVAL" else None
+    envelope_sha = _sha256(envelope_snapshot)
+    durable_ref = _verified_payload_reference(envelope_snapshot, payload_sha256=payload_sha, resolver=payload_ref_resolver)
+    human_actor = _human_actor_evidence(envelope_snapshot, verifier=human_identity_verifier) if artifact_type == "APPROVAL" else None
     reconstructable = durable_ref is not None
     observation_payload = {
-        "event": _event_for(envelope, human_actor=human_actor),
+        "event": _event_for(envelope_snapshot, human_actor=human_actor),
         "observer_identity": {"repository": TRACE_REPOSITORY, "commit": observer_commit, "runtime_identity": _snapshot(observer_runtime_identity)},
-        "interop": {"contract_version": CONTRACT_VERSION, "artifact_type": artifact_type, "artifact_id": envelope["artifact_id"],
-                    "artifact_state": envelope.get("state"), "producer": producer, "subject": subject,
-                    "verdict": envelope.get("verdict"), "disposition": envelope.get("disposition"),
-                    "authority": _snapshot(envelope["authority"]), "authorization_refs": _snapshot(envelope.get("authorization_refs") or []),
-                    "evidence_refs": _snapshot(envelope.get("evidence_refs") or []), "intended_consumers": _snapshot(envelope.get("intended_consumers") or []),
-                    "payload_sha256": payload_sha, "envelope_sha256": _sha256(envelope), "durable_payload_ref": durable_ref,
+        "interop": {"contract_version": CONTRACT_VERSION, "artifact_type": artifact_type, "artifact_id": envelope_snapshot["artifact_id"],
+                    "artifact_state": envelope_snapshot.get("state"), "producer": producer, "subject": subject,
+                    "verdict": envelope_snapshot.get("verdict"), "disposition": envelope_snapshot.get("disposition"),
+                    "authority": _snapshot(envelope_snapshot["authority"]), "authorization_refs": _snapshot(envelope_snapshot.get("authorization_refs") or []),
+                    "evidence_refs": _snapshot(envelope_snapshot.get("evidence_refs") or []), "intended_consumers": _snapshot(envelope_snapshot.get("intended_consumers") or []),
+                    "payload_sha256": payload_sha, "envelope_sha256": envelope_sha, "durable_payload_ref": durable_ref,
                     "reconstruction_gap": not reconstructable},
     }
     if artifact_type == "APPROVAL":
-        observation_payload.update({"decision": payload.get("decision"), "approved_by_asserted": _asserted_approval_actor(envelope),
+        observation_payload.update({"decision": payload.get("decision"), "approved_by_asserted": _asserted_approval_actor(envelope_snapshot),
                                     "human_actor_established": human_actor is not None})
     elif artifact_type == "RESULT":
         observation_payload["result_status"] = payload.get("status")
     elif artifact_type == "RETRY_REQUEST":
         observation_payload["retry_reason"] = payload.get("reason")
-    return {"source_type": "rts_interop_artifact", "actor": human_actor, "source_timestamp": envelope["created_at"],
+    return {"source_type": "rts_interop_artifact", "actor": human_actor, "source_timestamp": envelope_snapshot["created_at"],
             "captured_at": captured_at or _now_iso(), "payload": observation_payload,
-            "provenance": f"{CONTRACT_VERSION}:{producer['repository']}:{envelope['artifact_id']}",
+            "provenance": f"{CONTRACT_VERSION}:{producer['repository']}:{envelope_snapshot['artifact_id']}",
             "uncertainty": "SUPPORTED" if reconstructable else "UNKNOWN"}
 
 
