@@ -24,6 +24,10 @@ def _sha256(value: Any) -> str:
     return hashlib.sha256(_canonical_json(value)).hexdigest()
 
 
+def _valid_sha256(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(ch in "0123456789abcdef" for ch in value)
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -44,8 +48,9 @@ def _human_actor_evidence(envelope: dict[str, Any], *, verifier: Callable[[dict[
     for ref in envelope.get("evidence_refs") or []:
         if not isinstance(ref, dict) or ref.get("kind") != "human_identity_evidence":
             continue
+        ref_snapshot = _snapshot(ref)
         try:
-            if verifier(_snapshot(ref), actor, envelope_digest) is True:
+            if verifier(ref_snapshot, actor, envelope_digest) is True:
                 return actor
         except Exception:
             continue
@@ -80,8 +85,10 @@ def _validate_envelope(envelope: dict[str, Any]) -> None:
         raise ValueError("GATE_RESULT verdict is required")
     if envelope["artifact_type"] == "PROMOTION_DECISION" and not envelope.get("disposition"):
         raise ValueError("PROMOTION_DECISION disposition is required")
-    if envelope["artifact_type"] in {"APPROVAL", "PROMOTION_DECISION"} and not ((envelope.get("subject") or {}).get("target_identity") or {}).get("sha256"):
-        raise ValueError("decision artifact requires immutable target_identity")
+    if envelope["artifact_type"] in {"APPROVAL", "PROMOTION_DECISION"}:
+        target = (envelope.get("subject") or {}).get("target_identity") or {}
+        if not target.get("repository") or not target.get("artifact_id") or not _valid_sha256(target.get("sha256")):
+            raise ValueError("decision artifact requires repository/artifact_id and canonical 64-char lowercase target sha256")
 
 
 def _verified_payload_reference(envelope: dict[str, Any], *, payload_sha256: str,
@@ -92,14 +99,15 @@ def _verified_payload_reference(envelope: dict[str, Any], *, payload_sha256: str
     for ref in envelope.get("evidence_refs") or []:
         if not isinstance(ref, dict):
             continue
-        if ref.get("kind") != "content_addressed_artifact" or ref.get("ref") != immutable_ref or ref.get("digest") != payload_sha256:
+        ref_snapshot = _snapshot(ref)
+        if ref_snapshot.get("kind") != "content_addressed_artifact" or ref_snapshot.get("ref") != immutable_ref or ref_snapshot.get("digest") != payload_sha256:
             continue
         try:
-            resolved = resolver(_snapshot(ref))
+            resolved = resolver(ref_snapshot)
         except Exception:
             continue
         if resolved is not None and _sha256(resolved) == payload_sha256:
-            return _snapshot(ref)
+            return ref_snapshot
     return None
 
 
