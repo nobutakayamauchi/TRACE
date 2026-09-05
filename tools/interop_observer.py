@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 CONTRACT_VERSION = "rts-interop/v1"
 TRACE_REPOSITORY = "nobutakayamauchi/TRACE"
@@ -20,7 +20,16 @@ _ARTIFACT_EVENTS = {
 
 
 def _canonical_json(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _snapshot(value: Any) -> Any:
+    return json.loads(_canonical_json(value).decode("utf-8"))
 
 
 def _sha256(value: Any) -> str:
@@ -31,21 +40,30 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _human_actor_evidence(envelope: dict[str, Any]) -> str | None:
+def _human_actor_evidence(
+    envelope: dict[str, Any],
+    *,
+    verifier: Callable[[dict[str, Any], str], bool] | None,
+) -> str | None:
+    """Return a human actor only when a trusted verifier confirms the evidence ref."""
+    if verifier is None:
+        return None
     payload = envelope.get("payload") or {}
     approved_by = payload.get("approved_by")
     if not isinstance(approved_by, str) or not approved_by:
         return None
     for ref in envelope.get("evidence_refs") or []:
-        if not isinstance(ref, dict):
+        if not isinstance(ref, dict) or ref.get("kind") != "human_identity_evidence":
             continue
-        identity = ref.get("identity") or {}
-        if ref.get("kind") == "human_identity_evidence" and isinstance(identity, dict) and identity.get("actor") == approved_by and identity.get("verified") is True:
-            return approved_by
+        try:
+            if verifier(ref, approved_by) is True:
+                return approved_by
+        except Exception:
+            continue
     return None
 
 
-def _event_for(envelope: dict[str, Any]) -> str:
+def _event_for(envelope: dict[str, Any], *, human_actor: str | None) -> str:
     artifact_type = envelope["artifact_type"]
     if artifact_type == "GATE_RESULT":
         verdict = envelope.get("verdict")
@@ -55,7 +73,7 @@ def _event_for(envelope: dict[str, Any]) -> str:
             return "GATE_FAILED"
         return "GATE_RESULT_OBSERVED"
     if artifact_type == "APPROVAL":
-        return "HUMAN_DECISION" if _human_actor_evidence(envelope) else "APPROVAL_ARTIFACT_OBSERVED"
+        return "HUMAN_DECISION" if human_actor else "APPROVAL_ARTIFACT_OBSERVED"
     if artifact_type == "PROMOTION_DECISION":
         return "PROMOTION_DECISION_OBSERVED"
     return _ARTIFACT_EVENTS[artifact_type]
@@ -65,8 +83,16 @@ def _validate_envelope(envelope: dict[str, Any]) -> None:
     if envelope.get("contract_version") != CONTRACT_VERSION:
         raise ValueError("unsupported interop contract version")
     allowed = {
-        "UNIT", "RESULT", "EVIDENCE", "GATE_RESULT", "RETRY_REQUEST",
-        "APPROVAL", "TRACE", "LEARNING_CANDIDATE", "PROMOTION_DECISION", "FREEZE_RECORD",
+        "UNIT",
+        "RESULT",
+        "EVIDENCE",
+        "GATE_RESULT",
+        "RETRY_REQUEST",
+        "APPROVAL",
+        "TRACE",
+        "LEARNING_CANDIDATE",
+        "PROMOTION_DECISION",
+        "FREEZE_RECORD",
     }
     artifact_type = envelope.get("artifact_type")
     if artifact_type not in allowed:
@@ -92,18 +118,33 @@ def _validate_envelope(envelope: dict[str, Any]) -> None:
             raise ValueError(f"{artifact_type} requires immutable target_identity")
 
 
-def _durable_payload_reference(envelope: dict[str, Any], *, payload_sha256: str) -> dict[str, Any] | None:
-    """Accept only an immutable content-addressed reference bound to this exact payload."""
+def _verified_payload_reference(
+    envelope: dict[str, Any],
+    *,
+    payload_sha256: str,
+    resolver: Callable[[dict[str, Any]], Any | None] | None,
+) -> dict[str, Any] | None:
+    """Accept a content-addressed ref only after resolving and hash-verifying its bytes/value."""
+    if resolver is None:
+        return None
     for ref in envelope.get("evidence_refs") or []:
         if not isinstance(ref, dict):
             continue
         if (
-            ref.get("kind") == "content_addressed_artifact"
-            and isinstance(ref.get("ref"), str)
-            and ref.get("ref")
-            and ref.get("digest") == payload_sha256
+            ref.get("kind") != "content_addressed_artifact"
+            or not isinstance(ref.get("ref"), str)
+            or not ref.get("ref")
+            or ref.get("digest") != payload_sha256
         ):
-            return ref
+            continue
+        try:
+            resolved = resolver(ref)
+        except Exception:
+            continue
+        if resolved is None:
+            continue
+        if _sha256(resolved) == payload_sha256:
+            return _snapshot(ref)
     return None
 
 
@@ -112,6 +153,8 @@ def observe_interop_envelope(
     *,
     observer_runtime_identity: dict[str, Any],
     observer_commit: str,
+    payload_ref_resolver: Callable[[dict[str, Any]], Any | None] | None = None,
+    human_identity_verifier: Callable[[dict[str, Any], str], bool] | None = None,
     captured_at: str | None = None,
 ) -> dict[str, Any]:
     """Convert one artifact into a passive TRACE source-record candidate, never archived truth."""
@@ -122,17 +165,29 @@ def observe_interop_envelope(
         raise ValueError("observer commit identity is required")
 
     artifact_type = str(envelope["artifact_type"])
-    producer = dict(envelope.get("producer") or {})
-    subject = dict(envelope.get("subject") or {})
-    payload = dict(envelope.get("payload") or {})
+    producer = _snapshot(envelope.get("producer") or {})
+    subject = _snapshot(envelope.get("subject") or {})
+    payload = _snapshot(envelope.get("payload") or {})
     payload_sha = _sha256(payload)
-    durable_ref = _durable_payload_reference(envelope, payload_sha256=payload_sha)
-    human_actor = _human_actor_evidence(envelope) if artifact_type == "APPROVAL" else None
+    durable_ref = _verified_payload_reference(
+        envelope,
+        payload_sha256=payload_sha,
+        resolver=payload_ref_resolver,
+    )
+    human_actor = (
+        _human_actor_evidence(envelope, verifier=human_identity_verifier)
+        if artifact_type == "APPROVAL"
+        else None
+    )
     reconstructable = durable_ref is not None
 
     observation_payload = {
-        "event": _event_for(envelope),
-        "observer_identity": {"repository": TRACE_REPOSITORY, "commit": observer_commit, "runtime_identity": observer_runtime_identity},
+        "event": _event_for(envelope, human_actor=human_actor),
+        "observer_identity": {
+            "repository": TRACE_REPOSITORY,
+            "commit": observer_commit,
+            "runtime_identity": _snapshot(observer_runtime_identity),
+        },
         "interop": {
             "contract_version": CONTRACT_VERSION,
             "artifact_type": artifact_type,
@@ -142,10 +197,10 @@ def observe_interop_envelope(
             "subject": subject,
             "verdict": envelope.get("verdict"),
             "disposition": envelope.get("disposition"),
-            "authority": dict(envelope["authority"]),
-            "authorization_refs": list(envelope.get("authorization_refs") or []),
-            "evidence_refs": list(envelope.get("evidence_refs") or []),
-            "intended_consumers": list(envelope.get("intended_consumers") or []),
+            "authority": _snapshot(envelope["authority"]),
+            "authorization_refs": _snapshot(envelope.get("authorization_refs") or []),
+            "evidence_refs": _snapshot(envelope.get("evidence_refs") or []),
+            "intended_consumers": _snapshot(envelope.get("intended_consumers") or []),
             "payload_sha256": payload_sha,
             "envelope_sha256": _sha256(envelope),
             "durable_payload_ref": durable_ref,
@@ -172,11 +227,18 @@ def observe_interop_envelope(
     }
 
 
-def seal_source_record_candidate(candidate: dict[str, Any], *, record_id: str, source_order: int, previous_record_hash: str | None) -> dict[str, Any]:
+def seal_source_record_candidate(
+    candidate: dict[str, Any],
+    *,
+    record_id: str,
+    source_order: int,
+    previous_record_hash: str | None,
+) -> dict[str, Any]:
     if not record_id:
         raise ValueError("record_id is required")
     if source_order < 1:
         raise ValueError("source_order must be >= 1")
+    payload_snapshot = _snapshot(candidate["payload"])
     record = {
         "record_id": record_id,
         "source_type": candidate["source_type"],
@@ -184,14 +246,25 @@ def seal_source_record_candidate(candidate: dict[str, Any], *, record_id: str, s
         "source_order": source_order,
         "source_timestamp": candidate.get("source_timestamp"),
         "captured_at": candidate["captured_at"],
-        "payload": candidate["payload"],
-        "payload_sha256": _sha256(candidate["payload"]),
+        "payload": payload_snapshot,
+        "payload_sha256": _sha256(payload_snapshot),
         "previous_record_hash": previous_record_hash,
         "provenance": candidate["provenance"],
         "uncertainty": candidate["uncertainty"],
     }
     record["record_hash"] = _sha256(record)
     return record
+
+
+def _verify_sealed_candidate_record(record: dict[str, Any]) -> None:
+    stored_hash = str(record.get("record_hash") or "")
+    if not stored_hash:
+        raise ValueError("record_hash is required")
+    material = {key: value for key, value in record.items() if key != "record_hash"}
+    if _sha256(material) != stored_hash:
+        raise PermissionError("sealed TRACE candidate record hash mismatch")
+    if _sha256(record.get("payload")) != record.get("payload_sha256"):
+        raise PermissionError("sealed TRACE candidate payload hash mismatch")
 
 
 def trace_envelope_from_record_candidate(
@@ -205,6 +278,7 @@ def trace_envelope_from_record_candidate(
     """Publish only a PROPOSED TRACE candidate until the archive owner appends/reseals it."""
     if not observer_runtime_identity or not observer_commit:
         raise ValueError("observer deployment identity is required")
+    _verify_sealed_candidate_record(record)
     interop = record["payload"]["interop"]
     hashed_artifact_id = interop["artifact_id"]
     hashed_repository = interop["producer"]["repository"]
@@ -216,11 +290,21 @@ def trace_envelope_from_record_candidate(
         "artifact_type": "TRACE",
         "artifact_id": f"trace-candidate:{record['record_id']}:{record['record_hash'][:16]}",
         "created_at": record["captured_at"],
-        "producer": {"repository": TRACE_REPOSITORY, "component": "tools.interop_observer", "commit": observer_commit, "runtime_identity": observer_runtime_identity},
+        "producer": {
+            "repository": TRACE_REPOSITORY,
+            "component": "tools.interop_observer",
+            "commit": observer_commit,
+            "runtime_identity": _snapshot(observer_runtime_identity),
+        },
         "subject": {
             "unit_id": None,
             "target_artifact_id": hashed_artifact_id,
-            "target_identity": {"repository": hashed_repository, "artifact_id": hashed_artifact_id, "sha256": source_digest, "commit": None},
+            "target_identity": {
+                "repository": hashed_repository,
+                "artifact_id": hashed_artifact_id,
+                "sha256": source_digest,
+                "commit": None,
+            },
             "parent_artifact_ids": [hashed_artifact_id],
         },
         "intended_consumers": [],
