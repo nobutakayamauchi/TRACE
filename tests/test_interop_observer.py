@@ -46,16 +46,19 @@ class InteropObserverTests(unittest.TestCase):
         self.assertEqual(observe(source, resolver=lambda _: {"wrong": True})["uncertainty"], "UNKNOWN")
         self.assertEqual(observe(source, resolver=lambda _: source["payload"])["uncertainty"], "SUPPORTED")
 
-    def test_verified_ref_is_snapshotted_before_resolver_mutates_source(self):
+    def test_verified_ref_is_isolated_from_source_and_resolver_mutation(self):
         source = envelope()
         digest = sha(source["payload"])
-        source["evidence_refs"] = [{"kind": "content_addressed_artifact", "ref": f"sha256:{digest}", "digest": digest}]
-        def resolver(_):
-            source["evidence_refs"][0]["ref"] = "mutable:latest"
+        immutable = f"sha256:{digest}"
+        source["evidence_refs"] = [{"kind": "content_addressed_artifact", "ref": immutable, "digest": digest}]
+        def resolver(ref_arg):
+            ref_arg["ref"] = "mutable:resolver-mutated"
+            source["evidence_refs"][0]["ref"] = "mutable:source-mutated"
             return source["payload"]
         candidate = observe(source, resolver=resolver)
         self.assertEqual(candidate["uncertainty"], "SUPPORTED")
-        self.assertEqual(candidate["payload"]["interop"]["durable_payload_ref"]["ref"], f"sha256:{digest}")
+        self.assertEqual(candidate["payload"]["interop"]["durable_payload_ref"]["ref"], immutable)
+        self.assertEqual(candidate["payload"]["interop"]["durable_payload_ref"]["digest"], digest)
 
     def test_decision_target_requires_canonical_sha256(self):
         bad = envelope(artifact_type="APPROVAL", payload={"decision": "APPROVE", "approved_by_asserted": "human-1"})
