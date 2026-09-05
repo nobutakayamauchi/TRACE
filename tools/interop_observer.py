@@ -116,8 +116,9 @@ def observe_interop_envelope(envelope: dict[str, Any], *, observer_runtime_ident
                              human_identity_verifier: Callable[[dict[str, Any], str, str], bool] | None = None,
                              captured_at: str | None = None) -> dict[str, Any]:
     envelope_snapshot = _snapshot(envelope)
+    observer_identity_snapshot = _snapshot(observer_runtime_identity)
     _validate_envelope(envelope_snapshot)
-    if not isinstance(observer_runtime_identity, dict) or not observer_runtime_identity or not observer_commit:
+    if not isinstance(observer_identity_snapshot, dict) or not observer_identity_snapshot or not observer_commit:
         raise ValueError("observer deployment identity is required")
     artifact_type = str(envelope_snapshot["artifact_type"])
     producer = _snapshot(envelope_snapshot.get("producer") or {})
@@ -130,7 +131,7 @@ def observe_interop_envelope(envelope: dict[str, Any], *, observer_runtime_ident
     reconstructable = durable_ref is not None
     observation_payload = {
         "event": _event_for(envelope_snapshot, human_actor=human_actor),
-        "observer_identity": {"repository": TRACE_REPOSITORY, "commit": observer_commit, "runtime_identity": _snapshot(observer_runtime_identity)},
+        "observer_identity": {"repository": TRACE_REPOSITORY, "commit": observer_commit, "runtime_identity": observer_identity_snapshot},
         "interop": {"contract_version": CONTRACT_VERSION, "artifact_type": artifact_type, "artifact_id": envelope_snapshot["artifact_id"],
                     "artifact_state": envelope_snapshot.get("state"), "producer": producer, "subject": subject,
                     "verdict": envelope_snapshot.get("verdict"), "disposition": envelope_snapshot.get("disposition"),
